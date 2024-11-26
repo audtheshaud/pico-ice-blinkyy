@@ -13,14 +13,13 @@ use cortex_m_rt::entry;
 use core::ptr::read_volatile;
 use core::ptr::write_volatile;
 const GPIO_OE: usize = 0x20;
-const GPIO_OUT_SET: usize = 0x14;
-const GPIO_OUT_CLEAR: usize = 0x18;
+const GPIO_XOR: usize = 0x2C;
 const SIO_BASE_ADDR: usize = 0xD0000000;
 
 const IO_BANK0: usize = 0x40014000;
-const GPIO15_CTRL: usize = 0x7C;
+const GPIO23_CTRL: usize = 0xBC;
 const RESET_DONE_REG: usize = 0x4000C008;
-const GPIO_15: usize = 15;
+const GPIO_23: usize = 23;
 
 fn read_register(address: usize) -> u32 {
     unsafe { read_volatile(address as *const u32) }
@@ -32,32 +31,33 @@ fn write_register(address: usize, value: u32) {
 
 #[entry]
 fn main() -> ! {
-    write_register(IO_BANK0, 1 << 5); // Set SIO function of the GPIO pins function MUX by setting value to 5
+    // Reset the IO_BANK0
+    write_register(0x4000f000, 1 << 5);
 
-    while read_register(RESET_DONE_REG) & (1 << 5) == 0 {
-        nop();
-    }
+    // Wait for reset to complete
+    while read_register(RESET_DONE_REG) & (1 << 5) == 0 { nop(); }
 
-    // Set GPIO15 function to 5 (SIO control)
-    write_register(IO_BANK0 + GPIO15_CTRL, 1 << 5);
+    // Set GPIO function to 5 (SIO control)
+    write_register(IO_BANK0 + GPIO23_CTRL, 1 << 5);
 
-    // Set GPIO15 as an output pin
-    write_register(SIO_BASE_ADDR + GPIO_OE, 1 << GPIO_15);
+    // Set GPIO as an output pin
+    write_register(SIO_BASE_ADDR + GPIO_OE, 1 << GPIO_23);
+
     loop {
-        // Turn GPIO15 (LED) ON
-        write_register(SIO_BASE_ADDR + GPIO_OUT_SET, 1 << GPIO_15);
+        // Toggle GPIO (LED) ON
+        write_register(SIO_BASE_ADDR + GPIO_XOR, 1 << GPIO_23);
 
         // Delay for the blink
-        for _ in 0..1_000_000 {
+        for _ in 0..100_000_000 {
             nop();
         }
 
-        // Turn GPIO15 (LED) OFF
-        write_register(SIO_BASE_ADDR + GPIO_OUT_CLEAR, 1 << GPIO_15);
+        /* // Turn GPIO15 (LED) OFF
+        write_register(SIO_BASE_ADDR + GPIO_OUT_CLEAR, 1 << GPIO_13);
 
         // Delay for the blink
-        for _ in 0..1_000_000 {
+        for _ in 0..100_000 {
             nop();
-        }
+        } */
     }
 }
